@@ -8,7 +8,11 @@ const port = process.env.PORT || 3000;
 
 // middle wares
 app.use(cors({
-  origin:["http://localhost:5173","https://job-portal-9bb40.web.app"],
+  origin:[
+    "http://localhost:5173",
+    "https://job-portal-9bb40.web.app",
+    "https://job-portal-9bb40.firebaseapp.com",
+    ],
   credentials:true
 }));
 app.use(express.json());
