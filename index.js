@@ -1,11 +1,32 @@
 const express = require("express");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
+const cookieParser=require("cookie-parser");
 const app = express();
 require('dotenv').config()
 const port = process.env.PORT || 3000;
 
-app.use(cors());
+// middle wares
+app.use(cors({
+  origin:["http://localhost:5173","https://job-portal-9bb40.web.app"],
+  credentials:true
+}));
 app.use(express.json());
+app.use(cookieParser());
+
+const verifyToken =(req,res,next) =>{
+  const token = req.cookies.token;
+  if(!token){
+    return res.status(401).send({message:"forbidden access"})
+  }
+  jwt.verify(token,process.env.JWT_SECRET,(err,decoded) =>{
+    if(err){
+      return res.status(401).send({message:"forbidden access"})
+    }
+    req.user=decoded
+    next()
+  })
+}
 
 app.get("/", (req,res) =>{
     res.send("find your career goal")
@@ -33,6 +54,28 @@ async function run() {
     // await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
+    // Auth related APIs
+    app.post("/jwt", async(req,res) =>{
+     const user = req.body;
+     const token = jwt.sign({data:user},process.env.JWT_SECRET,{expiresIn:"3h"})
+     res
+     .cookie("token", token,{
+      httpOnly:true,
+      secure:false,
+      sameSite:"strict"
+     })
+     .send({success:true})
+    })
+
+    app.post("/logout", async(req,res) =>{
+      res.clearCookie("token",{
+        httpOnly:true,
+        secure:false,
+        sameSite:"strict",
+        maxAge:36000,
+      })
+      .send({logout: true})
+    })
     // jobs related APIs
 
     app.get("/jobs", async(req,res) => {
@@ -60,10 +103,15 @@ async function run() {
 
     // job applications apis 
 
-    app.get("/job-applications", async (req,res) => {
+    app.get("/job-applications",verifyToken, async (req,res) => {
       const email = req.query.email;
-      const query = {
-        applicant_email: email};
+      const query = {applicant_email: email};
+     if(req?.user?.data?.email !== req.query.email){
+      return res.status(403).send({message:"forbidden access"});
+     }
+      // if(req?.user?.data?.email !== req.query.email){
+      //   return res.status(403).send({message:"Forbidden access"})
+      // }
         const result = await jobApplicationCollection.find(query).toArray();
 
         for(const application of result){
